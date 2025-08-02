@@ -1,9 +1,9 @@
+package app.auf
+
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
-import app.auf.App
-import app.auf.StateManager
 import java.io.File
 import java.util.Properties
 

@@ -1,13 +1,13 @@
 package app.auf
 
-/*import com.aallam.openai.api.chat.ChatCompletionRequest
+import com.aallam.openai.api.chat.ChatCompletionRequest
 import com.aallam.openai.api.chat.ChatMessage as OpenAIChatMessage
 import com.aallam.openai.api.chat.ChatRole
 import com.aallam.openai.api.model.ModelId
 import com.aallam.openai.client.OpenAI
-*/
+
 class Gateway(apiKey: String) {
-/*
+
     // The OpenAI client is now initialized with the key passed to the constructor.
     private val openAI = OpenAI(apiKey)
 
@@ -31,5 +31,5 @@ class Gateway(apiKey: String) {
             e.printStackTrace()
             return ChatMessage(Author.AI, "Error: Could not connect to the AI. ${e.message}")
         }
-    }*/
+    }
 }
