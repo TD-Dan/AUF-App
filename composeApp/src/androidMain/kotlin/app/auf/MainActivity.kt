@@ -12,8 +12,12 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
+        // Pass the API key from BuildConfig to the StateManager.
+        val stateManager = StateManager(BuildConfig.OPENAI_API_KEY)
+        stateManager.loadCatalogue()
+
         setContent {
-            App()
+            App(stateManager)
         }
     }
 }
@@ -21,5 +25,6 @@ class MainActivity : ComponentActivity() {
 @Preview
 @Composable
 fun AppAndroidPreview() {
-    App()
+    // For the preview, a dummy key can be used as it won't be making real calls.
+    App(StateManager("dummy_preview_key"))
 }

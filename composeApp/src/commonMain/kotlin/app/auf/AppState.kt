@@ -11,7 +11,10 @@ data class HolonCatalogueFile(
 
 data class AppState(
     val holonCatalogue: List<HolonHeader> = emptyList(),
+    // This new property will hold the currently selected filter type.
+    val catalogueFilter: String? = null,
     val activeHolons: Map<String, Holon> = emptyMap(),
+    val activeHolonId: String? = null,
     val sessionTranscript: List<ChatMessage> = emptyList(),
     val gatewayStatus: GatewayStatus = GatewayStatus.DISCONNECTED,
     val isProcessing: Boolean = false
@@ -31,9 +34,11 @@ enum class GatewayStatus {
     CONNECTED, DISCONNECTED, ERROR
 }
 
+// The Holon class will now hold its content as well as its header.
 @Serializable
 data class Holon(
-    val header: HolonHeader
+    val header: HolonHeader,
+    val content: String
 )
 
 @Serializable
