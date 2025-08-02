@@ -81,15 +81,13 @@ kotlin {
             // implementation(libs.kotlinx.coroutinesSwing)
             implementation(libs.ktor.client.cio)
         }
-        val iosMain by getting {
-            dependencies {
+        listOf("iosX64Main", "iosArm64Main", "iosSimulatorArm64Main").forEach {
+            getByName(it).dependencies {
                 implementation(libs.ktor.client.darwin)
             }
         }
-        val wasmJsMain by getting {
-            dependencies {
-                implementation(libs.ktor.client.js)
-            }
+        getByName("wasmJsMain").dependencies {
+            implementation(libs.ktor.client.js)
         }
     }
 }
