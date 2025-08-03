@@ -13,18 +13,19 @@ fun main() = application {
     val localPropertiesFile = File("local.properties")
     val apiKey = if (localPropertiesFile.exists()) {
         properties.load(localPropertiesFile.inputStream())
-        properties.getProperty("openai.api.key", "")
+        // Corrected property name to align with our non-OpenAI approach
+        properties.getProperty("google.api.key", "")
     } else {
         ""
     }
 
     if (apiKey.isBlank()) {
-        println("WARNING: openai.api.key not found in local.properties. The application will not be able to connect to the AI.")
+        println("WARNING: google.api.key not found in local.properties. The application will not be able to connect to the AI.")
     }
 
-    // Pass the API key to the StateManager
+    // Pass the API key to the StateManager. It will now self-initialize.
     val stateManager = StateManager(apiKey)
-    stateManager.loadCatalogue()
+    // stateManager.loadCatalogue() // <-- REMOVED THIS LINE
 
     Window(
         onCloseRequest = ::exitApplication,

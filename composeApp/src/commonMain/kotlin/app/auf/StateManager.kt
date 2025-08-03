@@ -14,24 +14,36 @@ class StateManager(apiKey: String) {
 
     private val jsonParser = Json { isLenient = true; ignoreUnknownKeys = true }
     private val coroutineScope = CoroutineScope(Dispatchers.Default)
-    // The gateway is now instantiated with the provided API key.
-    private val gateway = Gateway(apiKey)
+    private val gateway: GatewayInterface
 
-    fun loadCatalogue() {
+    init {
+        gateway = GoogleAIGateway(apiKey)
+        // ADDED: The StateManager now loads its own catalogue upon creation.
+        loadCatalogue()
+    }
+
+    private fun loadCatalogue() { // This function correctly remains private
         try {
             val catalogueFile = File("framework/holon_catalogue.json")
+            if (!catalogueFile.exists()) {
+                throw IllegalStateException("Critical Failure: holon_catalogue.json not found at ${catalogueFile.absolutePath}")
+            }
             val catalogueJson = catalogueFile.readText()
             val parsedCatalogue = jsonParser.decodeFromString<HolonCatalogueFile>(catalogueJson)
 
             _state.update { currentState ->
-                currentState.copy(holonCatalogue = parsedCatalogue.holon_catalogue)
+                currentState.copy(
+                    holonCatalogue = parsedCatalogue.holon_catalogue,
+                    gatewayStatus = GatewayStatus.OK
+                )
             }
         } catch (e: Exception) {
-            println("Error loading catalogue: ${e.message}")
+            e.printStackTrace()
             _state.update { it.copy(gatewayStatus = GatewayStatus.ERROR) }
         }
     }
 
+    // ... (rest of the file is unchanged) ...
     fun startSession(holonId: String) {
         val holonHeader = _state.value.holonCatalogue.find { it.id == holonId }
         if (holonHeader == null) {
@@ -41,6 +53,9 @@ class StateManager(apiKey: String) {
 
         try {
             val holonFile = File("framework/${holonHeader.filePath}")
+            if (!holonFile.exists()) {
+                throw IllegalStateException("Holon file not found: ${holonFile.absolutePath}")
+            }
             val holonContent = holonFile.readText()
             val holon = Holon(header = holonHeader, content = holonContent)
 
@@ -48,7 +63,7 @@ class StateManager(apiKey: String) {
                 it.copy(
                     activeHolonId = holonId,
                     activeHolons = it.activeHolons + (holonId to holon),
-                    sessionTranscript = emptyList()
+                    sessionTranscript = emptyList() // Clear transcript for new session
                 )
             }
         } catch (e: Exception) {
@@ -57,6 +72,12 @@ class StateManager(apiKey: String) {
     }
 
     fun sendMessage(message: String) {
+        // Prevent sending messages if the gateway failed to initialize
+        if (_state.value.gatewayStatus == GatewayStatus.ERROR) {
+            println("Cannot send message, gateway is in an error state.")
+            return
+        }
+
         val userMessage = ChatMessage(Author.USER, message)
         _state.update {
             it.copy(

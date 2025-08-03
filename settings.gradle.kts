@@ -12,10 +12,14 @@ pluginManagement {
         }
         mavenCentral()
         gradlePluginPortal()
+        // ADDED: The required repository for JetBrains Compose artifacts (like WASM)
+        maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
     }
 }
 
 dependencyResolutionManagement {
+    // ADDED: Best practice for reliable dependency resolution
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         google {
             mavenContent {
@@ -25,6 +29,8 @@ dependencyResolutionManagement {
             }
         }
         mavenCentral()
+        // ADDED: The required repository for JetBrains Compose artifacts (like WASM)
+        maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
     }
 }
 
@@ -33,3 +39,5 @@ plugins {
 }
 
 include(":composeApp")
+// ADDED: Ensure the iOS module is included in the build
+include(":iosApp")

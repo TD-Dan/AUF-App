@@ -16,7 +16,8 @@ data class AppState(
     val activeHolons: Map<String, Holon> = emptyMap(),
     val activeHolonId: String? = null,
     val sessionTranscript: List<ChatMessage> = emptyList(),
-    val gatewayStatus: GatewayStatus = GatewayStatus.DISCONNECTED,
+    // Default state is now IDLE.
+    val gatewayStatus: GatewayStatus = GatewayStatus.IDLE,
     val isProcessing: Boolean = false
 )
 
@@ -30,8 +31,9 @@ enum class Author {
     USER, AI
 }
 
+// Corrected Enum
 enum class GatewayStatus {
-    CONNECTED, DISCONNECTED, ERROR
+    OK, IDLE, ERROR
 }
 
 // The Holon class will now hold its content as well as its header.
