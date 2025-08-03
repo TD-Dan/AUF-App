@@ -11,13 +11,11 @@ fun main() = application {
     // --- 1. SETUP: Determine settings directory and initialize managers ---
     val settingsDir = File(System.getProperty("user.home"), ".auf")
     val settingsManager = SettingsManager(settingsDir)
-
-    // Load saved settings, or use defaults if none exist.
     val savedSettings = settingsManager.loadSettings() ?: UserSettings()
 
     // --- 2. API KEY: Load developer secret from local.properties ---
     val properties = Properties()
-    val localPropertiesFile = File("composeApp/local.properties")
+    val localPropertiesFile = File("local.properties")
     val apiKey = if (localPropertiesFile.exists()) {
         properties.load(localPropertiesFile.inputStream())
         properties.getProperty("google.api.key", "")
