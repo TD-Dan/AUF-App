@@ -75,16 +75,28 @@ class GoogleAIGateway(private val apiKey: String) : GatewayInterface {
     suspend fun listModels(): List<String> {
         try {
             val endpoint = "$baseEndpoint/models"
-            val response: ListModelsResponse = httpClient.get(endpoint) {
+
+            // --- DEBUGGING CHANGE ---
+            // Get the raw response as a string first
+            val rawJsonResponse: String = httpClient.get(endpoint) {
                 parameter("key", apiKey)
             }.body()
+
+            // Print it for us to see
+            println("--- RAW JSON RESPONSE FROM listModels ---")
+            println(rawJsonResponse)
+            println("----------------------------------------")
+
+            // Now, try to parse it (this will still fail, but we will see why)
+            val response = jsonParser.decodeFromString<ListModelsResponse>(rawJsonResponse)
+            // --- END DEBUGGING CHANGE ---
 
             // The API returns names like "models/gemini-1.5-pro-latest", so we clean them up.
             return response.models.map { it.name.removePrefix("models/") }
         } catch (e: Exception) {
             e.printStackTrace()
-            // If the API call fails, return a safe, hardcoded list as a fallback.
-            return listOf("gemini-1.5-pro-latest", "gemini-1.5-flash-latest")
+            // If the API call fails, return an empty list. The StateManager will handle the fallback.
+            return emptyList()
         }
     }
 }

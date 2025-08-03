@@ -7,9 +7,13 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import java.io.File
 
-class StateManager(apiKey: String) {
+class StateManager(apiKey: String, private val initialSettings: UserSettings) {
 
-    private val _state = MutableStateFlow(AppState())
+    // Now this line can correctly access the 'initialSettings' property.
+    private val _state = MutableStateFlow(AppState(
+        selectedModel = initialSettings.selectedModel,
+        activeHolonIds = initialSettings.activeHolonIds
+    ))
     val state: StateFlow<AppState> = _state.asStateFlow()
 
     private val jsonParser = Json { isLenient = true; ignoreUnknownKeys = true }
