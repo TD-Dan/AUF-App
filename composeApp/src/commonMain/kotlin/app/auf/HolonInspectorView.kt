@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.Divider
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
@@ -22,45 +24,40 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun HolonInspectorView(stateManager: StateManager, modifier: Modifier = Modifier) {
     val appState by stateManager.state.collectAsState()
-    // Find the full Holon object from the activeHolons map.
-    val activeHolon = appState.activeHolons[appState.activeHolonId]
+    // --- CORRECTED LOGIC: Now we just look up the holon by the inspected ID ---
+    val inspectedHolon = appState.activeHolons[appState.inspectedHolonId]
 
-    // The outer Box now uses the modifier passed from App.kt and adds padding.
     Box(
         modifier = modifier.fillMaxSize().padding(16.dp),
-        contentAlignment = Alignment.TopStart // Align content to the top-start.
+        contentAlignment = Alignment.TopStart
     ) {
-        if (activeHolon != null) {
-            // If a holon is selected, display its details.
-            Column {
+        if (inspectedHolon != null) {
+            // Added a scrollable column for long holon content
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 Text(
-                    text = activeHolon.header.name,
+                    text = inspectedHolon.header.name,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = "ID: ${activeHolon.header.id}",
+                    text = "ID: ${inspectedHolon.header.id}",
                     fontSize = 12.sp,
                     fontStyle = FontStyle.Italic
                 )
                 Spacer(Modifier.height(16.dp))
                 Text(
-                    text = activeHolon.header.summary,
+                    text = inspectedHolon.header.summary,
                     fontSize = 14.sp
                 )
-
-                // Add a divider and display the main content of the holon.
                 Divider(modifier = Modifier.padding(vertical = 16.dp))
                 Text(
-                    text = activeHolon.content,
+                    text = inspectedHolon.content,
                     fontSize = 13.sp,
-                    fontStyle = FontStyle.Italic,
-                    color = Color.Gray
+                    color = Color.DarkGray // Improved contrast
                 )
             }
         } else {
-            // If no holon is selected, show a placeholder message.
             Text("Select a holon from the catalogue to see its details.", fontStyle = FontStyle.Italic)
         }
     }

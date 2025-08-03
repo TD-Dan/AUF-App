@@ -22,66 +22,69 @@ class GoogleAIGateway(private val apiKey: String) : GatewayInterface {
         }
     }
 
-    private val model = "gemini-1.5-pro-latest"
-    private val endpoint = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent"
+    private val baseEndpoint = "https://generativelanguage.googleapis.com/v1beta"
 
-    // --- Data classes for parsing the API responses ---
+    // --- Data classes for parsing API responses ---
+    @Serializable private data class GeminiRequest(val contents: List<Content>)
+    @Serializable private data class Content(val parts: List<Part>)
+    @Serializable private data class Part(val text: String)
 
-    // For a SUCCESSFUL response
-    @Serializable
-    private data class GeminiSuccessResponse(val candidates: List<Candidate>)
-    @Serializable
-    private data class Candidate(val content: Content)
-    @Serializable
-    private data class Content(val parts: List<Part>)
-    @Serializable
-    private data class Part(val text: String)
+    @Serializable private data class GeminiSuccessResponse(val candidates: List<Candidate>)
+    @Serializable private data class Candidate(val content: Content)
 
-    // For an ERROR response (matches the JSON you provided)
-    @Serializable
-    private data class GeminiErrorResponse(val error: ApiError)
-    @Serializable
-    private data class ApiError(val message: String, val code: Int, val status: String)
+    @Serializable private data class GeminiErrorResponse(val error: ApiError)
+    @Serializable private data class ApiError(val message: String, val code: Int, val status: String)
 
-    // For the request body
-    @Serializable
-    private data class GeminiRequest(val contents: List<Content>)
+    // --- Data classes for listing models ---
+    @Serializable private data class ListModelsResponse(val models: List<ModelInfo>)
+    @Serializable private data class ModelInfo(val name: String)
 
-    override suspend fun ask(prompt: String): ChatMessage {
+
+    // --- Gateway Interface Implementation ---
+
+    override suspend fun ask(prompt: String, model: String): ChatMessage {
         try {
-            val requestBody = GeminiRequest(
-                contents = listOf(Content(parts = listOf(Part(text = prompt))))
-            )
+            val endpoint = "$baseEndpoint/models/$model:generateContent"
+            val requestBody = GeminiRequest(contents = listOf(Content(parts = listOf(Part(text = prompt)))))
 
-            // Get the response from the API
             val responseElement: JsonElement = httpClient.post(endpoint) {
                 parameter("key", apiKey)
                 contentType(ContentType.Application.Json)
                 setBody(requestBody)
             }.body()
 
-            // 2. Check if the response is a success or an error
+            // ... (The success/error handling logic remains the same)
             if (responseElement.jsonObject.containsKey("candidates")) {
-                // It's a success, parse it as such
                 val successResponse = jsonParser.decodeFromJsonElement<GeminiSuccessResponse>(responseElement)
                 val responseContent = successResponse.candidates.first().content.parts.first().text
                 return ChatMessage(Author.AI, responseContent)
-
             } else if (responseElement.jsonObject.containsKey("error")) {
-                // It's an error, parse it and format a user-friendly message
                 val errorResponse = jsonParser.decodeFromJsonElement<GeminiErrorResponse>(responseElement)
                 val errorMessage = "AI Error (${errorResponse.error.code}): ${errorResponse.error.message}"
-                println(errorMessage) // Also print to console for debugging
+                println(errorMessage)
                 return ChatMessage(Author.AI, errorMessage)
-
             } else {
-                // The response is in an unknown format
                 return ChatMessage(Author.AI, "Error: Received an unknown response format from the AI gateway.")
             }
-
         } catch (e: Exception) {
             e.printStackTrace()
             return ChatMessage(Author.AI, "Error: Could not connect to or process response from Google AI. ${e.message}")
+        }
+    }
+
+    suspend fun listModels(): List<String> {
+        try {
+            val endpoint = "$baseEndpoint/models"
+            val response: ListModelsResponse = httpClient.get(endpoint) {
+                parameter("key", apiKey)
+            }.body()
+
+            // The API returns names like "models/gemini-1.5-pro-latest", so we clean them up.
+            return response.models.map { it.name.removePrefix("models/") }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            // If the API call fails, return a safe, hardcoded list as a fallback.
+            return listOf("gemini-1.5-pro-latest", "gemini-1.5-flash-latest")
         }
     }
 }

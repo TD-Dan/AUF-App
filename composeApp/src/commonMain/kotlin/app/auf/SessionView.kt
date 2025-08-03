@@ -29,7 +29,8 @@ import androidx.compose.ui.unit.sp
 fun SessionView(stateManager: StateManager, modifier: Modifier = Modifier) {
     val appState by stateManager.state.collectAsState()
     val holonCatalogue = appState.holonCatalogue
-    val activeHolonId = appState.activeHolonId
+    // --- CHANGED to use the new Set of active IDs ---
+    val activeHolonIds = appState.activeHolonIds
     val activeFilter = appState.catalogueFilter
 
     val holonTypes = holonCatalogue.map { it.type }.distinct().sorted()
@@ -48,7 +49,7 @@ fun SessionView(stateManager: StateManager, modifier: Modifier = Modifier) {
             modifier = Modifier.padding(bottom = 12.dp)
         )
 
-        // Use FlowRow with reduced spacing for a more compact layout.
+        // Filter buttons remain the same
         FlowRow(
             modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -57,7 +58,6 @@ fun SessionView(stateManager: StateManager, modifier: Modifier = Modifier) {
             val buttonPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
             val buttonFontSize = 12.sp
 
-            // "All" button with compact styling
             Button(
                 onClick = { stateManager.setCatalogueFilter(null) },
                 contentPadding = buttonPadding,
@@ -67,7 +67,6 @@ fun SessionView(stateManager: StateManager, modifier: Modifier = Modifier) {
                 )
             ) { Text("All", fontSize = buttonFontSize) }
 
-            // Buttons for each holon type with compact styling
             holonTypes.forEach { type ->
                 Button(
                     onClick = { stateManager.setCatalogueFilter(type) },
@@ -80,10 +79,10 @@ fun SessionView(stateManager: StateManager, modifier: Modifier = Modifier) {
             }
         }
 
-        // The LazyColumn now displays the filtered list.
+        // The LazyColumn now uses the new selection logic
         LazyColumn {
             items(filteredCatalogue) { holon ->
-                val isSelected = holon.id == activeHolonId
+                val isSelected = activeHolonIds.contains(holon.id)
                 val backgroundColor = if (isSelected) Color(0xFFE0E0E0) else Color.Transparent
                 val fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
 
@@ -92,7 +91,11 @@ fun SessionView(stateManager: StateManager, modifier: Modifier = Modifier) {
                     fontWeight = fontWeight,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { stateManager.startSession(holon.id) }
+                        // --- CHANGED to call both functions ---
+                        .clickable {
+                            stateManager.toggleHolonActive(holon.id)
+                            stateManager.inspectHolon(holon.id)
+                        }
                         .background(backgroundColor)
                         .padding(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 8.dp)
                 )

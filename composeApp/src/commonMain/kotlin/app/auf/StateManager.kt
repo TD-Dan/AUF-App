@@ -18,82 +18,82 @@ class StateManager(apiKey: String) {
 
     init {
         gateway = GoogleAIGateway(apiKey)
-        // ADDED: The StateManager now loads its own catalogue upon creation.
         loadCatalogue()
+        loadAvailableModels()
     }
 
-    private fun loadCatalogue() { // This function correctly remains private
+    private fun loadCatalogue() {
         try {
             val catalogueFile = File("framework/holon_catalogue.json")
-            if (!catalogueFile.exists()) {
-                throw IllegalStateException("Critical Failure: holon_catalogue.json not found at ${catalogueFile.absolutePath}")
-            }
+            if (!catalogueFile.exists()) { throw IllegalStateException("Critical Failure: holon_catalogue.json not found.") }
             val catalogueJson = catalogueFile.readText()
             val parsedCatalogue = jsonParser.decodeFromString<HolonCatalogueFile>(catalogueJson)
-
-            _state.update { currentState ->
-                currentState.copy(
-                    holonCatalogue = parsedCatalogue.holon_catalogue,
-                    gatewayStatus = GatewayStatus.OK
-                )
-            }
+            _state.update { it.copy(holonCatalogue = parsedCatalogue.holon_catalogue, gatewayStatus = GatewayStatus.OK) }
         } catch (e: Exception) {
             e.printStackTrace()
             _state.update { it.copy(gatewayStatus = GatewayStatus.ERROR) }
         }
     }
 
-    // ... (rest of the file is unchanged) ...
-    fun startSession(holonId: String) {
-        val holonHeader = _state.value.holonCatalogue.find { it.id == holonId }
-        if (holonHeader == null) {
-            println("Error: Holon with ID $holonId not found in catalogue.")
-            return
-        }
-
-        try {
-            val holonFile = File("framework/${holonHeader.filePath}")
-            if (!holonFile.exists()) {
-                throw IllegalStateException("Holon file not found: ${holonFile.absolutePath}")
+    // --- CORRECTED to be more resilient, as you suggested ---
+    private fun loadAvailableModels() {
+        coroutineScope.launch {
+            // We can only list models if we have a GoogleAIGateway
+            if (gateway is GoogleAIGateway) {
+                val models = gateway.listModels()
+                if (models.isNotEmpty()) {
+                    _state.update { it.copy(availableModels = models) }
+                } else {
+                    // If the API call fails or returns no models, use the hardcoded default
+                    _state.update { it.copy(availableModels = listOf("gemini-1.5-pro-latest", "gemini-1.5-flash-latest")) }
+                }
             }
-            val holonContent = holonFile.readText()
-            val holon = Holon(header = holonHeader, content = holonContent)
-
-            _state.update {
-                it.copy(
-                    activeHolonId = holonId,
-                    activeHolons = it.activeHolons + (holonId to holon),
-                    sessionTranscript = emptyList() // Clear transcript for new session
-                )
-            }
-        } catch (e: Exception) {
-            println("Error loading holon content for ${holonHeader.name}: ${e.message}")
         }
     }
 
+    // --- CORRECTED to pass the model to the gateway ---
     fun sendMessage(message: String) {
-        // Prevent sending messages if the gateway failed to initialize
-        if (_state.value.gatewayStatus == GatewayStatus.ERROR) {
-            println("Cannot send message, gateway is in an error state.")
-            return
-        }
+        if (_state.value.gatewayStatus == GatewayStatus.ERROR) { return }
 
         val userMessage = ChatMessage(Author.USER, message)
-        _state.update {
-            it.copy(
-                sessionTranscript = it.sessionTranscript + userMessage,
-                isProcessing = true
-            )
-        }
+        val currentModel = _state.value.selectedModel // Get the currently selected model
+        _state.update { it.copy(sessionTranscript = it.sessionTranscript + userMessage, isProcessing = true) }
 
         coroutineScope.launch {
-            val aiResponse = gateway.ask(message)
-            _state.update {
-                it.copy(
-                    sessionTranscript = it.sessionTranscript + aiResponse,
-                    isProcessing = false
-                )
-            }
+            // Pass the model to the gateway's ask function
+            val aiResponse = gateway.ask(message, currentModel)
+            _state.update { it.copy(sessionTranscript = it.sessionTranscript + aiResponse, isProcessing = false) }
+        }
+    }
+
+    fun toggleHolonActive(holonId: String) {
+        val currentActiveIds = _state.value.activeHolonIds
+        val newActiveIds = if (currentActiveIds.contains(holonId)) currentActiveIds - holonId else currentActiveIds + holonId
+        _state.update { it.copy(activeHolonIds = newActiveIds) }
+    }
+
+    fun inspectHolon(holonId: String?) {
+        if (holonId == null) {
+            _state.update { it.copy(inspectedHolonId = null) }
+            return
+        }
+        if (_state.value.activeHolons.containsKey(holonId)) {
+            _state.update { it.copy(inspectedHolonId = holonId) }
+            return
+        }
+        val holonHeader = _state.value.holonCatalogue.find { it.id == holonId } ?: return
+        try {
+            val holonFile = File("framework/${holonHeader.filePath}")
+            val holon = Holon(header = holonHeader, content = holonFile.readText())
+            _state.update { it.copy(inspectedHolonId = holonId, activeHolons = it.activeHolons + (holonId to holon)) }
+        } catch (e: Exception) {
+            println("Error loading holon content for inspection: ${e.message}")
+        }
+    }
+
+    fun selectModel(modelName: String) {
+        if (modelName in _state.value.availableModels) {
+            _state.update { it.copy(selectedModel = modelName) }
         }
     }
 

@@ -11,14 +11,17 @@ data class HolonCatalogueFile(
 
 data class AppState(
     val holonCatalogue: List<HolonHeader> = emptyList(),
-    // This new property will hold the currently selected filter type.
     val catalogueFilter: String? = null,
     val activeHolons: Map<String, Holon> = emptyMap(),
-    val activeHolonId: String? = null,
+    val activeHolonIds: Set<String> = emptySet(),
+    // --- ADDED to track the single holon being inspected ---
+    val inspectedHolonId: String? = null,
     val sessionTranscript: List<ChatMessage> = emptyList(),
-    // Default state is now IDLE.
     val gatewayStatus: GatewayStatus = GatewayStatus.IDLE,
-    val isProcessing: Boolean = false
+    val isProcessing: Boolean = false,
+    // --- CHANGED for dynamic model loading ---
+    val availableModels: List<String> = emptyList(), // Starts empty
+    val selectedModel: String = "gemini-1.5-flash-latest" // Still defaults to a safe, cheap model
 )
 
 data class ChatMessage(

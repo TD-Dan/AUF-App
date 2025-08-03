@@ -8,7 +8,9 @@ interface GatewayInterface {
     /**
      * Sends a prompt to the configured AI model and returns the response.
      * @param prompt The user's input message.
+     * @param model The specific model to use for this request.
      * @return A ChatMessage object containing the AI's response.
      */
-    suspend fun ask(prompt: String): ChatMessage
+    // --- CHANGED to include the model parameter, fixing the error ---
+    suspend fun ask(prompt: String, model: String): ChatMessage
 }
