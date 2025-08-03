@@ -26,6 +26,7 @@ dependencyResolutionManagement {
                 includeGroupAndSubgroups("androidx")
                 includeGroupAndSubgroups("com.android")
                 includeGroupAndSubgroups("com.google")
+                includeGroupAndSubgroups("com.google.ai")
             }
         }
         mavenCentral()
