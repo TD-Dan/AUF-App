@@ -11,7 +11,6 @@ import java.time.format.DateTimeFormatter
 
 class StateManager(apiKey: String, private val initialSettings: UserSettings) {
 
-    // ... (StateFlow, jsonParser, gateway, etc. remain the same) ...
     private val _state = MutableStateFlow(AppState(
         selectedModel = initialSettings.selectedModel,
         activeHolonIds = initialSettings.activeHolonIds
@@ -19,7 +18,8 @@ class StateManager(apiKey: String, private val initialSettings: UserSettings) {
     val state: StateFlow<AppState> = _state.asStateFlow()
     private val jsonParser = Json { isLenient = true; ignoreUnknownKeys = true }
     private val coroutineScope = CoroutineScope(Dispatchers.Default)
-    private val gateway: Gateway()
+    // MODIFIED: Correctly initialize the Gateway instance
+    private val gateway: Gateway = Gateway()
     private val appVersion = "1.0.0"
 
     init {
@@ -43,6 +43,10 @@ class StateManager(apiKey: String, private val initialSettings: UserSettings) {
     private fun buildContextualPrompt(newMessage: String): String {
         val promptBuilder = StringBuilder()
         val catalogue = _state.value.holonCatalogue
+
+        // This function is now just for preparing the prompt.
+        // The actual sending is handled by the Gateway.
+        // All file reading logic remains correct.
 
         // Base protocol
         promptBuilder.appendLine(readFileContent("framework/framework_protocol.md"))
@@ -97,7 +101,6 @@ class StateManager(apiKey: String, private val initialSettings: UserSettings) {
         return promptBuilder.toString()
     }
 
-    // --- FINAL VERSION: With just-in-time hibernation instructions ---
     fun sendMessage(message: String) {
         if (_state.value.gatewayStatus == GatewayStatus.ERROR) { return }
 
@@ -105,42 +108,25 @@ class StateManager(apiKey: String, private val initialSettings: UserSettings) {
         _state.update { it.copy(sessionTranscript = it.sessionTranscript + userMessage, isProcessing = true) }
 
         coroutineScope.launch {
-            val fullPrompt: String
-            val isHibernation = message.trim() == "[SYSTEM_COMMAND: GENERATE_HIBERNATION_PROPOSAL]"
+            val fullPrompt = buildContextualPrompt(message)
 
-            if (isHibernation) {
-                // For hibernation, build the standard prompt AND append the hibernation instructions
-                val basePrompt = buildContextualPrompt(message)
-                val hibernationInstructions = readFileContent("framework/hibernation_protocol.md")
-                fullPrompt = "$basePrompt\n$hibernationInstructions"
-            } else {
-                // For normal conversation, just build the standard prompt
-                fullPrompt = buildContextualPrompt(message)
-            }
+            // MODIFIED: Use the new Gateway method. This will return our placeholder for now.
+            val responseContent = gateway.generateContent(fullPrompt)
+            val aiResponse = ChatMessage(Author.AI, responseContent)
 
-            val currentModel = _state.value.selectedModel
-            val aiResponse = gateway.ask(fullPrompt, currentModel)
-
-            if (isHibernation) {
-                // Intercept the hibernation command's output for manual review
-                println("\n\n--- HIBERNATION PACKET RECEIVED ---")
-                println("--- Please manually copy, review, and commit these files. ---")
-                println("----------------------------------------------------------\n")
+            // We simplify the hibernation logic for now. The core logic is to get a response.
+            if (message.trim() == "[SYSTEM_COMMAND: GENERATE_HIBERNATION_PROPOSAL]") {
+                println("\n\n--- HIBERNATION PACKET (MOCK) ---")
                 println(aiResponse.content)
-                println("\n----------------------------------------------------------")
-                println("--- END OF HIBERNATION PACKET ---")
-
-                val confirmationMessage = ChatMessage(Author.AI, "Hibernation proposal generated. Please check the application console for the full output.")
+                println("--- END OF HIBERNATION PACKET ---\n")
+                val confirmationMessage = ChatMessage(Author.AI, "Hibernation proposal (mock) generated. See console.")
                 _state.update { it.copy(sessionTranscript = it.sessionTranscript + confirmationMessage, isProcessing = false) }
-
             } else {
-                // Original logic for normal conversation
                 _state.update { it.copy(sessionTranscript = it.sessionTranscript + aiResponse, isProcessing = false) }
             }
         }
     }
 
-    // ... (loadCatalogue, loadAvailableModels, and other functions remain the same) ...
     private fun loadCatalogue() {
         try {
             val catalogueFile = File("framework/holon_catalogue.json")
@@ -153,23 +139,21 @@ class StateManager(apiKey: String, private val initialSettings: UserSettings) {
             _state.update { it.copy(gatewayStatus = GatewayStatus.ERROR) }
         }
     }
+
+    // MODIFIED: This function is now simplified as it's no longer tied to an SDK.
+    // We will use a hardcoded list until we build a settings screen.
     private fun loadAvailableModels() {
-        coroutineScope.launch {
-            if (gateway is GoogleAIGateway) {
-                val models = gateway.listModels()
-                if (models.isNotEmpty()) {
-                    _state.update { it.copy(availableModels = models) }
-                } else {
-                    _state.update { it.copy(availableModels = listOf("gemini-1.5-pro-latest", "gemini-1.5-flash-latest")) }
-                }
-            }
+        _state.update {
+            it.copy(availableModels = listOf("gemini-1.5-pro-latest", "gemini-1.5-flash-latest"))
         }
     }
+
     fun toggleHolonActive(holonId: String) {
         val currentActiveIds = _state.value.activeHolonIds
         val newActiveIds = if (currentActiveIds.contains(holonId)) currentActiveIds - holonId else currentActiveIds + holonId
         _state.update { it.copy(activeHolonIds = newActiveIds) }
     }
+
     fun inspectHolon(holonId: String?) {
         if (holonId == null) {
             _state.update { it.copy(inspectedHolonId = null) }
@@ -188,11 +172,13 @@ class StateManager(apiKey: String, private val initialSettings: UserSettings) {
             println("Error loading holon content for inspection: ${e.message}")
         }
     }
+
     fun selectModel(modelName: String) {
         if (modelName in _state.value.availableModels) {
             _state.update { it.copy(selectedModel = modelName) }
         }
     }
+
     fun setCatalogueFilter(type: String?) {
         _state.update { it.copy(catalogueFilter = type) }
     }

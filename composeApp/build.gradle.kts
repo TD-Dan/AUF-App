@@ -34,10 +34,6 @@ kotlin {
 
     jvm()
 
-    dependencies {
-        api(platform("com.google.ai.client.generativeai:generativeai-bom:0.9.0"))
-    }
-
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
         outputModuleName.set("composeApp")
@@ -83,9 +79,7 @@ kotlin {
         }
         jvmMain.dependencies {
             implementation(compose.desktop.currentOs)
-            // implementation(libs.kotlinx.coroutinesSwing)
             implementation(libs.ktor.client.cio)
-            implementation("com.google.ai.client.generativeai:generativeai")
         }
         listOf("iosX64Main", "iosArm64Main", "iosSimulatorArm64Main").forEach {
             getByName(it).dependencies {
