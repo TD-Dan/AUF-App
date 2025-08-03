@@ -26,7 +26,7 @@ fun main() = application {
     }
 
     // --- 3. STATE INITIALIZATION: Pass key and settings to the StateManager ---
-    val stateManager = StateManager(savedSettings)
+    val stateManager = StateManager(apiKey,savedSettings)
 
     // Use loaded settings to configure the initial window state.
     val windowState = rememberWindowState(
