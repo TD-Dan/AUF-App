@@ -8,12 +8,10 @@ import java.io.File
 import java.util.Properties
 
 fun main() = application {
-    // --- 1. SETUP: Determine settings directory and initialize managers ---
     val settingsDir = File(System.getProperty("user.home"), ".auf")
     val settingsManager = SettingsManager(settingsDir)
     val savedSettings = settingsManager.loadSettings() ?: UserSettings()
 
-    // --- 2. API KEY: Load developer secret from local.properties ---
     val properties = Properties()
     val localPropertiesFile = File("local.properties")
     val apiKey = if (localPropertiesFile.exists()) {
@@ -25,32 +23,28 @@ fun main() = application {
         println("WARNING: google.api.key not found in composeApp/local.properties. AI will not function.")
     }
 
-    // --- 3. STATE INITIALIZATION: Pass key and settings to the StateManager ---
-    val stateManager = StateManager(apiKey,savedSettings)
+    val stateManager = StateManager(apiKey, savedSettings)
 
-    // Use loaded settings to configure the initial window state.
     val windowState = rememberWindowState(
         width = savedSettings.windowWidth.dp,
         height = savedSettings.windowHeight.dp
     )
 
-    // --- 4. WINDOW LIFECYCLE: Load the app and define the save-on-exit behavior ---
     Window(
         onCloseRequest = {
-            // This block runs when the user closes the window.
+            val currentState = stateManager.state.value
 
-            // Get the current state from the UI and StateManager.
+            // MODIFIED: Create the new UserSettings object with the correct fields.
             val currentSettingsToSave = UserSettings(
                 windowWidth = windowState.size.width.value.toInt(),
                 windowHeight = windowState.size.height.value.toInt(),
-                selectedModel = stateManager.state.value.selectedModel,
-                activeHolonIds = stateManager.state.value.activeHolonIds
+                selectedModel = currentState.selectedModel,
+                // Save the "Me" and "World" state directly.
+                selectedAiPersonaId = currentState.aiPersonaId,
+                activeContextualHolonIds = currentState.contextualHolonIds
             )
 
-            // Save the current state to the file.
             settingsManager.saveSettings(currentSettingsToSave)
-
-            // Exit the application.
             exitApplication()
         },
         title = "AUF",

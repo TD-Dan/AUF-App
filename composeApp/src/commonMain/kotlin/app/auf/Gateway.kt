@@ -20,15 +20,20 @@ class Gateway {
         }
     }
 
-    suspend fun generateContent(apiKey: String, model: String, prompt: String): String {
+    // MODIFIED: The function now accepts a List<Content> instead of a raw String.
+    // This aligns the gateway with the StateManager's new prompt building logic.
+    suspend fun generateContent(apiKey: String, model: String, contents: List<Content>): String {
         val apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent"
-        val requestBody = GenerateContentRequest(contents = listOf(Content(parts = listOf(Part(text = prompt)))))
+        // MODIFIED: The request body is now created directly from the passed-in contents.
+        val requestBody = GenerateContentRequest(contents = contents)
         try {
             val response: GenerateContentResponse = client.post(apiUrl) {
                 parameter("key", apiKey)
                 contentType(ContentType.Application.Json)
                 setBody(requestBody)
             }.body()
+
+            // The rest of the response parsing logic remains correct.
             return response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
                 ?: response.promptFeedback?.blockReason?.let { "Blocked: $it" }
                 ?: "No content received."
@@ -39,7 +44,6 @@ class Gateway {
         }
     }
 
-    // ADDED: New function to fetch the list of models
     suspend fun listModels(apiKey: String): List<ModelInfo> {
         val apiUrl = "https://generativelanguage.googleapis.com/v1beta/models"
         return try {

@@ -2,14 +2,7 @@ package app.auf
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.Button
@@ -20,6 +13,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -29,12 +23,10 @@ import androidx.compose.ui.unit.sp
 fun SessionView(stateManager: StateManager, modifier: Modifier = Modifier) {
     val appState by stateManager.state.collectAsState()
     val holonCatalogue = appState.holonCatalogue
-    // --- CHANGED to use the new Set of active IDs ---
-    val activeHolonIds = appState.activeHolonIds
+    val activeContextualHolonIds = appState.contextualHolonIds
+    val activeAiPersonaId = appState.aiPersonaId
     val activeFilter = appState.catalogueFilter
-
     val holonTypes = holonCatalogue.map { it.type }.distinct().sorted()
-
     val filteredCatalogue = if (activeFilter == null) {
         holonCatalogue
     } else {
@@ -49,7 +41,6 @@ fun SessionView(stateManager: StateManager, modifier: Modifier = Modifier) {
             modifier = Modifier.padding(bottom = 12.dp)
         )
 
-        // Filter buttons remain the same
         FlowRow(
             modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -57,7 +48,6 @@ fun SessionView(stateManager: StateManager, modifier: Modifier = Modifier) {
         ) {
             val buttonPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
             val buttonFontSize = 12.sp
-
             Button(
                 onClick = { stateManager.setCatalogueFilter(null) },
                 contentPadding = buttonPadding,
@@ -66,7 +56,6 @@ fun SessionView(stateManager: StateManager, modifier: Modifier = Modifier) {
                     contentColor = if (activeFilter == null) Color.White else Color.Black
                 )
             ) { Text("All", fontSize = buttonFontSize) }
-
             holonTypes.forEach { type ->
                 Button(
                     onClick = { stateManager.setCatalogueFilter(type) },
@@ -79,19 +68,29 @@ fun SessionView(stateManager: StateManager, modifier: Modifier = Modifier) {
             }
         }
 
-        // The LazyColumn now uses the new selection logic
         LazyColumn {
             items(filteredCatalogue) { holon ->
-                val isSelected = activeHolonIds.contains(holon.id)
-                val backgroundColor = if (isSelected) Color(0xFFE0E0E0) else Color.Transparent
+                val isTheActiveAgent = activeAiPersonaId == holon.id
+                val isInContext = activeContextualHolonIds.contains(holon.id)
+                val isSelected = isTheActiveAgent || isInContext
+                val backgroundColor = when {
+                    isTheActiveAgent && isInContext -> Color(0xFFA9A9A9) // Darker grey if both active and in context
+                    isTheActiveAgent -> Color(0xFFD3D3D3) // Light grey if just active agent
+                    isInContext -> Color(0xFFE0E0E0) // Slightly lighter grey if just in context
+                    else -> Color.Transparent
+                }
                 val fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                val fontStyle = if (isTheActiveAgent) FontStyle.Italic else FontStyle.Normal
+                val displayText = if (isTheActiveAgent) "${holon.name} (Active Agent)" else holon.name
 
                 Text(
-                    text = holon.name,
+                    text = displayText,
                     fontWeight = fontWeight,
+                    fontStyle = fontStyle,
+                    color = if(isTheActiveAgent) Color.DarkGray else Color.Black,
                     modifier = Modifier
                         .fillMaxWidth()
-                        // --- CHANGED to call both functions ---
+                        // MODIFIED: Click is now always enabled.
                         .clickable {
                             stateManager.toggleHolonActive(holon.id)
                             stateManager.inspectHolon(holon.id)

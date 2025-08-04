@@ -12,6 +12,9 @@ data class GenerateContentRequest(
 
 @Serializable
 data class Content(
+    // MODIFIED: Added the 'role' field to match the Gemini API spec.
+    // The role will be "user" or "model".
+    val role: String,
     val parts: List<Part>
 )
 
@@ -25,8 +28,6 @@ data class Part(
 @Serializable
 data class GenerateContentResponse(
     val candidates: List<Candidate>?,
-    // MODIFIED: This field is not present on successful responses.
-    // Making it nullable with a default value of null fixes the crash.
     @SerialName("promptFeedback")
     val promptFeedback: PromptFeedback? = null
 )
@@ -62,8 +63,6 @@ data class ListModelsResponse(
 data class ModelInfo(
     val name: String,
     val displayName: String?,
-    // MODIFIED: This field is not present on all models.
-    // Making it nullable with a default value of null fixes the crash.
     val description: String? = null,
     @SerialName("version")
     val version: String
