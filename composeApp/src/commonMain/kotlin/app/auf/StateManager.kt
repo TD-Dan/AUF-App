@@ -9,7 +9,7 @@ import java.io.File
 import java.time.Instant
 import java.time.format.DateTimeFormatter
 
-class StateManager(apiKey: String, private val initialSettings: UserSettings) {
+class StateManager(private val apiKey: String, private val initialSettings: UserSettings) {
 
     private val _state = MutableStateFlow(AppState(
         selectedModel = initialSettings.selectedModel,
@@ -18,7 +18,6 @@ class StateManager(apiKey: String, private val initialSettings: UserSettings) {
     val state: StateFlow<AppState> = _state.asStateFlow()
     private val jsonParser = Json { isLenient = true; ignoreUnknownKeys = true }
     private val coroutineScope = CoroutineScope(Dispatchers.Default)
-    // MODIFIED: Correctly initialize the Gateway instance
     private val gateway: Gateway = Gateway()
     private val appVersion = "1.0.0"
 
@@ -27,6 +26,7 @@ class StateManager(apiKey: String, private val initialSettings: UserSettings) {
         loadAvailableModels()
     }
 
+    // ... (readFileContent, buildContextualPrompt, sendMessage are unchanged) ...
     private fun readFileContent(filePath: String): String {
         return try {
             val file = File(filePath)
@@ -39,14 +39,9 @@ class StateManager(apiKey: String, private val initialSettings: UserSettings) {
             ""
         }
     }
-
     private fun buildContextualPrompt(newMessage: String): String {
         val promptBuilder = StringBuilder()
         val catalogue = _state.value.holonCatalogue
-
-        // This function is now just for preparing the prompt.
-        // The actual sending is handled by the Gateway.
-        // All file reading logic remains correct.
 
         // Base protocol
         promptBuilder.appendLine(readFileContent("framework/framework_protocol.md"))
@@ -100,7 +95,6 @@ class StateManager(apiKey: String, private val initialSettings: UserSettings) {
 
         return promptBuilder.toString()
     }
-
     fun sendMessage(message: String) {
         if (_state.value.gatewayStatus == GatewayStatus.ERROR) { return }
 
@@ -109,23 +103,23 @@ class StateManager(apiKey: String, private val initialSettings: UserSettings) {
 
         coroutineScope.launch {
             val fullPrompt = buildContextualPrompt(message)
+            val currentModel = _state.value.selectedModel
 
-            // MODIFIED: Use the new Gateway method. This will return our placeholder for now.
-            val responseContent = gateway.generateContent(fullPrompt)
+            val responseContent = gateway.generateContent(apiKey, currentModel, fullPrompt)
             val aiResponse = ChatMessage(Author.AI, responseContent)
 
-            // We simplify the hibernation logic for now. The core logic is to get a response.
             if (message.trim() == "[SYSTEM_COMMAND: GENERATE_HIBERNATION_PROPOSAL]") {
-                println("\n\n--- HIBERNATION PACKET (MOCK) ---")
+                println("\n\n--- HIBERNATION PACKET RECEIVED ---")
                 println(aiResponse.content)
                 println("--- END OF HIBERNATION PACKET ---\n")
-                val confirmationMessage = ChatMessage(Author.AI, "Hibernation proposal (mock) generated. See console.")
+                val confirmationMessage = ChatMessage(Author.AI, "Hibernation proposal generated. See console.")
                 _state.update { it.copy(sessionTranscript = it.sessionTranscript + confirmationMessage, isProcessing = false) }
             } else {
                 _state.update { it.copy(sessionTranscript = it.sessionTranscript + aiResponse, isProcessing = false) }
             }
         }
     }
+
 
     private fun loadCatalogue() {
         try {
@@ -140,11 +134,18 @@ class StateManager(apiKey: String, private val initialSettings: UserSettings) {
         }
     }
 
-    // MODIFIED: This function is now simplified as it's no longer tied to an SDK.
-    // We will use a hardcoded list until we build a settings screen.
+    // MODIFIED: This function is now live.
     private fun loadAvailableModels() {
-        _state.update {
-            it.copy(availableModels = listOf("gemini-1.5-pro-latest", "gemini-1.5-flash-latest"))
+        coroutineScope.launch {
+            val models = gateway.listModels(apiKey)
+            if (models.isNotEmpty()) {
+                // We are interested in models that support 'generateContent'
+                val modelNames = models.map { it.name.removePrefix("models/") }
+                _state.update { it.copy(availableModels = modelNames) }
+            } else {
+                // Fallback to a default list if the API call fails
+                _state.update { it.copy(availableModels = listOf("gemini-1.5-pro-latest", "gemini-1.5-flash-latest")) }
+            }
         }
     }
 
@@ -153,7 +154,6 @@ class StateManager(apiKey: String, private val initialSettings: UserSettings) {
         val newActiveIds = if (currentActiveIds.contains(holonId)) currentActiveIds - holonId else currentActiveIds + holonId
         _state.update { it.copy(activeHolonIds = newActiveIds) }
     }
-
     fun inspectHolon(holonId: String?) {
         if (holonId == null) {
             _state.update { it.copy(inspectedHolonId = null) }
@@ -172,13 +172,11 @@ class StateManager(apiKey: String, private val initialSettings: UserSettings) {
             println("Error loading holon content for inspection: ${e.message}")
         }
     }
-
     fun selectModel(modelName: String) {
         if (modelName in _state.value.availableModels) {
             _state.update { it.copy(selectedModel = modelName) }
         }
     }
-
     fun setCatalogueFilter(type: String?) {
         _state.update { it.copy(catalogueFilter = type) }
     }

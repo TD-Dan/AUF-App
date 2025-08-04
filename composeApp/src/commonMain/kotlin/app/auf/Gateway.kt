@@ -1,22 +1,18 @@
 package app.auf
 
 import io.ktor.client.*
+import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.request.*
+import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
 
 class Gateway {
 
-    // 1. Create a single, reusable Ktor HttpClient instance.
-    //    This is more efficient than creating a new client for every request.
     private val client = HttpClient {
-        // 2. Install the ContentNegotiation plugin.
-        //    This plugin automatically serializes our request data classes to JSON
-        //    and deserializes the JSON responses back into our response data classes.
         install(ContentNegotiation) {
             json(Json {
-                // Configure the JSON parser to be lenient and ignore unknown keys,
-                // which makes our client more robust against API changes.
                 ignoreUnknownKeys = true
                 prettyPrint = true
                 isLenient = true
@@ -24,13 +20,35 @@ class Gateway {
         }
     }
 
-    // A placeholder for our future generateContent function.
-    // We will build this out next. It's a suspend function because Ktor's
-    // network calls are asynchronous and non-blocking.
-    suspend fun generateContent(prompt: String): String {
-        // TODO: Implement the actual REST API call to Google AI
-        return "This is a placeholder response for the prompt: $prompt"
+    suspend fun generateContent(apiKey: String, model: String, prompt: String): String {
+        val apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent"
+        val requestBody = GenerateContentRequest(contents = listOf(Content(parts = listOf(Part(text = prompt)))))
+        try {
+            val response: GenerateContentResponse = client.post(apiUrl) {
+                parameter("key", apiKey)
+                contentType(ContentType.Application.Json)
+                setBody(requestBody)
+            }.body()
+            return response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
+                ?: response.promptFeedback?.blockReason?.let { "Blocked: $it" }
+                ?: "No content received."
+        } catch (e: Exception) {
+            println("API Call Failed: ${e.message}")
+            e.printStackTrace()
+            return "Error: Could not connect to the API."
+        }
     }
 
-    // We can add other functions here for different API endpoints as needed.
+    // ADDED: New function to fetch the list of models
+    suspend fun listModels(apiKey: String): List<ModelInfo> {
+        val apiUrl = "https://generativelanguage.googleapis.com/v1beta/models"
+        return try {
+            client.get(apiUrl) {
+                parameter("key", apiKey)
+            }.body<ListModelsResponse>().models
+        } catch (e: Exception) {
+            println("Failed to fetch models: ${e.message}")
+            emptyList()
+        }
+    }
 }
